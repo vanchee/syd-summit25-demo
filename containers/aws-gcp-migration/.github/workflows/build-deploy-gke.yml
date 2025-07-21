@@ -3,17 +3,17 @@ name: 'CymbalBank - Build and deploy to GKE'
 on:
   push:
     branches:
-      - "next25-aws-gcp-migration"
+      - "main"
   
 defaults: 
   run:
     working-directory: './containers/aws-gcp-migration'
   
 env:
-  PROJECT_ID: 'next25migration'  
-  REGION: 'us-central1'
-  GKE_CLUSTER: 'acp-a-g-demo' 
-  REPOSITORY: 'acp-a-g-demo-repository'  
+  PROJECT_ID: 'pv-syd25migration'  
+  REGION: 'ap-southeast-2'
+  GKE_CLUSTER: 'pv-syd25-gke-cluster' 
+  REPOSITORY: 'pv-syd25-gke-repository'  
   
 jobs:
   build-and-deploy-gke:

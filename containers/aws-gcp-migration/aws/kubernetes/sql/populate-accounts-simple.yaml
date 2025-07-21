@@ -1,0 +1,68 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: populate-accounts-simple
+spec:
+  template:
+    spec:
+      containers:
+      - name: populate-db
+        image: postgres:13
+        command:
+        - /bin/bash
+        - -c
+        - |
+          # Get RDS IP from AWS CLI
+          RDS_IP=$(aws rds describe-db-instances --db-instance-identifier pv-syd-summit-demo-rds --region ap-southeast-2 --query 'DBInstances[0].Endpoint.Address' --output text)
+          echo "RDS IP: $RDS_IP"
+          
+          # Test connection
+          pg_isready -h $RDS_IP -p 5432 -U postgres
+          
+          # Create database if it doesn't exist
+          psql -h $RDS_IP -p 5432 -U postgres -d postgres -c "CREATE DATABASE \"accounts-db\" WITH OWNER = postgres ENCODING = 'UTF8' LC_COLLATE = 'en_US.utf8' LC_CTYPE = 'en_US.utf8' TEMPLATE template0;"
+          
+          # Create users table
+          psql -h $RDS_IP -p 5432 -U postgres -d accounts-db -c "
+          CREATE TABLE IF NOT EXISTS users (
+            accountid CHAR(10) PRIMARY KEY,
+            username VARCHAR(64) UNIQUE NOT NULL,
+            passhash BYTEA NOT NULL,
+            firstname VARCHAR(64) NOT NULL,
+            lastname VARCHAR(64) NOT NULL,
+            birthday DATE NOT NULL,
+            timezone VARCHAR(8) NOT NULL,
+            address VARCHAR(64) NOT NULL,
+            state CHAR(2) NOT NULL,
+            zip VARCHAR(5) NOT NULL,
+            ssn CHAR(11) NOT NULL
+          );"
+          
+          # Create contacts table
+          psql -h $RDS_IP -p 5432 -U postgres -d accounts-db -c "
+          CREATE TABLE IF NOT EXISTS contacts (
+            username VARCHAR(64) NOT NULL,
+            label VARCHAR(128) NOT NULL,
+            account_num CHAR(10) NOT NULL,
+            routing_num CHAR(9) NOT NULL,
+            is_external BOOLEAN NOT NULL,
+            FOREIGN KEY (username) REFERENCES users(username)
+          );"
+          
+          # Add test users
+          psql -h $RDS_IP -p 5432 -U postgres -d accounts-db -c "
+          INSERT INTO users VALUES 
+          ('1011226111', 'testuser', E'\\x2432622431322477595638423166664b50667a41524a6b69614d6c5075784847466961636b6d333349595952786d59645a6834435946696f49434943', 'Test', 'User', '2000-01-01', '-5', 'Bowling Green, New York City', 'NY', '10004', '111-22-3333'),
+          ('1033623433', 'alice', E'\\x2432622431322477595638423166664b50667a41524a6b69614d6c5075784847466961636b6d333349595952786d59645a6834435946696f49434943', 'Alice', 'User', '2000-01-01', '-5', 'Bowling Green, New York City', 'NY', '10004', '111-22-3333'),
+          ('1055757655', 'bob', E'\\x2432622431322477595638423166664b50667a41524a6b69614d6c5075784847466961636b6d333349595952786d59645a6834435946696f49434943', 'Bob', 'User', '2000-01-01', '-5', 'Bowling Green, New York City', 'NY', '10004', '111-22-3333'),
+          ('1077441377', 'eve', E'\\x2432622431322477595638423166664b50667a41524a6b69614d6c5075784847466961636b6d333349595952786d59645a6834435946696f49434943', 'Eve', 'User', '2000-01-01', '-5', 'Bowling Green, New York City', 'NY', '10004', '111-22-3333')
+          ON CONFLICT DO NOTHING;"
+          
+          echo "Database population completed successfully!"
+        env:
+        - name: PGPASSWORD
+          value: "Chiapet22!"
+        - name: AWS_DEFAULT_REGION
+          value: "ap-southeast-2"
+      restartPolicy: Never
+      serviceAccountName: cymbalbank-sa 
